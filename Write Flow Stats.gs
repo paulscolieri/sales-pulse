@@ -78,6 +78,3 @@ function writeFlowEmailStatsToSheet() {
 
   Logger.log("Flow Email Stats written successfully.");
 }
-
-
-
