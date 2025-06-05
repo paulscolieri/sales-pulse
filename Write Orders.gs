@@ -26,15 +26,22 @@ function writeLineItemsShopifyStyle() {
 
   const rows = [];
 
+  function formatDateMMDDYYYY(dateString) {
+    const date = new Date(dateString);
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+
   orders.forEach(order => {
     const orderName = order.name;
-    const createdAt = order.createdAt;
+    const createdAt = formatDateMMDDYYYY(order.createdAt);
     const financialStatus = order.displayFinancialStatus;
     const shippingTotal = parseFloat(order.totalShippingPriceSet?.shopMoney?.amount || 0);
     const subtotal = parseFloat(order.subtotalPriceSet?.shopMoney?.amount || 0);
     const totalDiscounts = parseFloat(order.totalDiscountsSet?.shopMoney?.amount || 0);
     const totalPaid = parseFloat(order.totalPriceSet?.shopMoney?.amount || 0);
-
 
     let isFirstLineItem = true;
 
@@ -50,8 +57,8 @@ function writeLineItemsShopifyStyle() {
       const grossProfit = ((unitPrice - unitCost) * quantity).toFixed(2);
 
       rows.push([
-        orderName,
-        isFirstLineItem ? createdAt : "",
+        orderName,            // repeat every row
+        createdAt,            // repeat every row
         isFirstLineItem ? financialStatus : "",
         isFirstLineItem ? shippingTotal : "",
         isFirstLineItem ? subtotal : "",
@@ -70,6 +77,8 @@ function writeLineItemsShopifyStyle() {
     });
   });
 
-  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-  Logger.log(`Wrote ${rows.length} line items in Shopify export format`);
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    Logger.log(`Wrote ${rows.length} line items in Shopify export format`);
+  }
 }
