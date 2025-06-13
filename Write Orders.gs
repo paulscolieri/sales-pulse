@@ -2,6 +2,24 @@ function writeLineItemsShopifyStyle() {
   const orders = getYesterdayOrders();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sales_Log") ||
                 SpreadsheetApp.getActiveSpreadsheet().insertSheet("Sales_Log");
+  
+  // 🆕 STEP 1: Create a Set of existing order names to prevent duplicates
+  let existingKeys = new Set();
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    existingKeys = new Set(
+      sheet.getRange(2, 1, lastRow - 1, 8) // Read columns A–H
+          .getValues()
+          .map(row => `${row[0]}|${row[7] || ""}`) // A = Order Name, H = SKU
+    );
+  }
+
+
+  Logger.log(`Loaded ${existingKeys.size} existing order+SKU keys`);
+  // 🔍 Optional debug: Log first 5 existing keys
+  Array.from(existingKeys).slice(0, 5).forEach(key => Logger.log(`Existing key: ${key}`));
+
 
   const headers = [
     "Order Name",
@@ -36,7 +54,7 @@ function writeLineItemsShopifyStyle() {
 
   orders.forEach(order => {
     const orderName = order.name;
-    const createdAt = formatDateMMDDYYYY(order.createdAt);
+    const createdAt = formatDateMMDDYYYY(order.createdAtStoreTime || order.createdAt);
     const financialStatus = order.displayFinancialStatus;
     const shippingTotal = parseFloat(order.totalShippingPriceSet?.shopMoney?.amount || 0);
     const subtotal = parseFloat(order.subtotalPriceSet?.shopMoney?.amount || 0);
@@ -46,8 +64,8 @@ function writeLineItemsShopifyStyle() {
     let isFirstLineItem = true;
 
     order.lineItems.edges.forEach(itemEdge => {
+     
       const item = itemEdge.node;
-
       const sku = item.sku || "";
       const title = item.title;
       const quantity = item.quantity;
@@ -55,6 +73,15 @@ function writeLineItemsShopifyStyle() {
       const discountedTotal = parseFloat(item.discountedTotalSet?.shopMoney?.amount || 0);
       const unitCost = parseFloat(item.unitCostAmount || 0);
       const grossProfit = ((unitPrice - unitCost) * quantity).toFixed(2);
+
+      const rowKey = `${orderName}|${sku}`;
+
+      Logger.log(`Checking rowKey: ${rowKey}`);
+      if (existingKeys.has(rowKey)) {
+        Logger.log(`Skipping duplicate line item: ${rowKey}`);
+        return;
+      }
+      existingKeys.add(rowKey);
 
       rows.push([
         orderName,            // repeat every row
