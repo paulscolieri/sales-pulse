@@ -1,0 +1,32 @@
+function writeMetaAdInsightsToSheet() {
+  const results = getMetaAdInsights();
+  if (!results.length) return;
+
+  const sheetName = "Ads Log";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+
+  // 🔧 Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    Logger.log(`📄 Created new sheet: ${sheetName}`);
+  }
+
+  // 🏷 Add headers if sheet is empty
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      "Date", "Campaign", "Ad Set", "Ad", "Impressions", "Clicks", "Spend", "CPM", "CPC", "CTR", "Purchases", "ROAS"
+    ]);
+  }
+
+  // 🖊 Write each result row
+  results.forEach(r => {
+    sheet.appendRow([
+      r.date, r.campaign_name, r.adset_name, r.ad_name,
+      r.impressions, r.clicks, r.spend, r.cpm, r.cpc, r.ctr,
+      r.purchases, r.roas
+    ]);
+  });
+
+  Logger.log(`✅ Wrote ${results.length} ad row(s) to ${sheetName}`);
+}
