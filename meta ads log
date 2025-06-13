@@ -33,7 +33,7 @@ function getMetaAdInsights() {
   const query = [
     `fields=${encodeURIComponent(fields)}`,
     `time_range=${encodeURIComponent(timeRange)}`,
-    `level=adset`,
+    `level=ad`,
     `time_increment=1`
   ].join("&");
 
@@ -47,7 +47,7 @@ function getMetaAdInsights() {
   }
 
   // Parse actions to extract purchases and purchase ROAS
-  const cleanResults = json.data.map(row => {
+    const cleanResults = json.data.map(row => {
     const actions = parseActions(row.actions || []);
     const values = parseActions(row.action_values || []);
 
@@ -63,9 +63,13 @@ function getMetaAdInsights() {
       cpc: parseFloat(row.cpc || 0),
       ctr: parseFloat(row.ctr || 0),
       purchases: actions.purchase || 0,
-      roas: values.purchase || 0
+      revenue: values.purchase || 0,
+      roas: (parseFloat(row.spend || 0) > 0)
+        ? (values.purchase || 0) / parseFloat(row.spend || 1)
+        : 0
     };
   });
+
 
   Logger.log(`✅ Pulled ${cleanResults.length} ad rows for ${since}`);
   return cleanResults;
