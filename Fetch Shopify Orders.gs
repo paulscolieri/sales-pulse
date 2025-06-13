@@ -7,14 +7,32 @@ function getYesterdayOrders() {
     throw new Error("Missing Shopify credentials. Run setCredentials() first.");
   }
 
-  // 1. Get UTC date filter for yesterday
+  // 👉 1. Fetch store IANA timezone (e.g. "America/Los_Angeles")
+  const tzQuery = JSON.stringify({
+    query: `{ shop { ianaTimezone } }`
+  });
+
+  const tzResponse = UrlFetchApp.fetch(url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN
+    },
+    payload: tzQuery
+  });
+
+  const storeTimezone = JSON.parse(tzResponse.getContentText()).data.shop.ianaTimezone;
+
+  // 👉 2. Calculate yesterday's range in store's local time
   const now = new Date();
   const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setDate(yesterday.getDate() - 1); // or -13 if you're testing historical
 
-  const start = new Date(yesterday.setUTCHours(0, 0, 0, 0)).toISOString();
-  const end = new Date(yesterday.setUTCHours(23, 59, 59, 999)).toISOString();
+  const start = Utilities.formatDate(new Date(yesterday.setHours(0, 0, 0, 0)), storeTimezone, `yyyy-MM-dd'T'HH:mm:ssXXX`);
+  const end = Utilities.formatDate(new Date(), storeTimezone, `yyyy-MM-dd'T'HH:mm:ssXXX`);
   const dateFilter = `created_at:>=${start} AND created_at:<=${end}`;
+
+  Logger.log(`Using date filter: ${dateFilter}`);
 
   let hasNextPage = true;
   let endCursor = null;
@@ -93,18 +111,25 @@ function getYesterdayOrders() {
 
     const edges = json.data.orders.edges;
 
-    // Add a safety check for cost
     edges.forEach(edge => {
       const order = edge.node;
 
       order.lineItems.edges.forEach(itemEdge => {
         const item = itemEdge.node;
-
         const cost = item.variant?.inventoryItem?.unitCost?.amount ?? null;
-        item.unitCostAmount = cost; // Injected for use downstream
+        item.unitCostAmount = cost;
       });
 
       allOrders.push(order);
+
+      // Log timestamps for debugging
+      const createdAtUTC = new Date(order.createdAt);
+      const createdAtStoreTime = Utilities.formatDate(createdAtUTC, storeTimezone, "yyyy-MM-dd HH:mm:ss");
+      order.createdAtStoreTime = createdAtStoreTime; // <- Add this line
+
+      Logger.log(`Order: ${order.name}`);
+      Logger.log(`  createdAt (UTC):        ${createdAtUTC.toISOString()}`);
+      Logger.log(`  createdAt (Store Time): ${createdAtStoreTime}`);
     });
 
     hasNextPage = json.data.orders.pageInfo.hasNextPage;
