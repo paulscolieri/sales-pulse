@@ -14,9 +14,12 @@ function writeMetaAdInsightsToSheet() {
 
   // 🏷 Add headers if sheet is empty
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      "Date", "Campaign", "Ad Set", "Ad", "Impressions", "Clicks", "Spend", "CPM", "CPC", "CTR", "Purchases", "ROAS"
+      sheet.appendRow([
+    "Date", "Campaign", "Ad Set", "Ad",
+    "Impressions", "Clicks", "Spend", "CPM", "CPC", "CTR",
+    "Purchases", "Revenue", "ROAS"
     ]);
+
   }
 
   // 🖊 Write each result row
@@ -24,7 +27,7 @@ function writeMetaAdInsightsToSheet() {
     sheet.appendRow([
       r.date, r.campaign_name, r.adset_name, r.ad_name,
       r.impressions, r.clicks, r.spend, r.cpm, r.cpc, r.ctr,
-      r.purchases, r.roas
+      r.purchases, r.revenue, r.roas
     ]);
   });
 
