@@ -108,4 +108,6 @@ function writeLineItemsShopifyStyle() {
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     Logger.log(`Wrote ${rows.length} line items in Shopify export format`);
   }
+
+
 }

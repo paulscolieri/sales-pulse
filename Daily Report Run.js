@@ -22,5 +22,10 @@ function runDailyReporting() {
   //6. Write Meta Ads Stats
   writeMetaAdInsightsToSheet();
 
+  // 7. Log shopify trends for AI
+  const shopifyTrends = getShopifyKpiTrends();
+  Logger.log(shopifyTrends);
+
+
   Logger.log("✅ Daily email reporting complete.");
 }
