@@ -26,5 +26,10 @@ function runDailyReporting() {
   const shopifyTrends = getShopifyKpiTrends();
   Logger.log(shopifyTrends);
 
+  // 🧠 Generate AI Summary
+  const summary = generateAndSendDailySummary();
+  Logger.log("✅ Summary complete.");
+  Logger.log(summary);
+
   Logger.log("✅ Daily email reporting complete.");
 }

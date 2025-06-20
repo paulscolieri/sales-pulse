@@ -1,9 +1,12 @@
 function generateAndSendDailySummary() {
-  const shopifySummary = writeLineItemsShopifyStyle();
-  const flowSummary = writeFlowEmailStatsToSheet();
-  const campaignSummary = writeCampaignDailyStatsToLog();
-  const adsSummary = writeMetaAdInsightsToSheet();
+  // Step 1: Pull summaries
+  const shopifySummary = getShopifySummaryFromSheet();
+  const flowSummary = getFlowSummaryFromSheet();
+  const campaignSummary = getCampaignSummaryFromSheet();
+  const adsSummary = getMetaAdSummaryFromSheet();
+  const context = getAiContextFromSheet();
 
+  // Step 2: Combine report
   const report = {
     date: new Date().toISOString().split("T")[0],
     shopify: shopifySummary,
@@ -12,21 +15,49 @@ function generateAndSendDailySummary() {
     meta_ads: adsSummary
   };
 
-  const prompt = `
-You're an ecommerce performance analyst. Here's a report of yesterday's performance data from multiple sources. Write a short, insightful executive summary (under 120 words) that highlights:
-- Key wins and underperformance
-- Notable trends or top-performing campaigns/products
-- ROAS context for ads
-- Anything worth flagging for tomorrow
+  // ✅ Add this line here
+  const trailingSummaryContext = getLast7AiSummaries();
 
-Be specific. Make it clear and concise. Here's the data:
+  // Step 3: Construct GPT prompt using the 5-question structure
+  const prompt = `
+You're an ecommerce performance analyst. Write a short, clear executive summary (under 150 words) of yesterday’s performance for the brand "${context["Brand Name"] || "our brand"}".
+
+Tone: ${context["Brand Voice"] || "concise and direct"}  
+Business Model: ${context["Business Model"] || "ecommerce"}  
+Key Products: ${context["Key Products"] || "N/A"}  
+Focus this week: ${context["Strategic Focus This Week"] || "N/A"}  
+Current promo: ${context["Current Offers/Promos"] || "None"}  
+Known external factors: ${context["Known External Factors"] || "None"}  
+
+Use the following structure to answer these 5 exec-level questions:
+
+1️⃣ **Did we make money yesterday?**  
+- Report daily revenue, profit, and margin. Compare to goals if available.
+
+2️⃣ **What worked or didn’t?**  
+- Highlight standout flows, campaigns, ads, or products. Flag underperformers or anomalies.
+
+3️⃣ **How does it compare to the past week?**  
+- Show sales, margin, or ROAS trendlines. Mention any big shifts in performance.
+
+4️⃣ **What needs attention?**  
+- Flag high ad spend with low ROAS, unsub spikes, flows with no conversions, etc.  
+- If relevant, include this note: ${context["⚠️ Anything to Watch"] || "N/A"}
+
+5️⃣ **Are we on pace to hit our goals?**  
+- Use sales goal (${context["Sales Goal (Daily)"] || "N/A"}) and margin goal (${context["Gross Margin Target"] || "N/A"}) to evaluate progress.
+
+${trailingSummaryContext ? "\n\n📅 Previous 7 Days of Summaries:\n" + trailingSummaryContext : ""}
+
+Here is the performance data:
 ${JSON.stringify(report, null, 2)}
 `;
 
+  // Step 4: Call OpenAI
   const payload = {
     model: "gpt-4o",
     messages: [
-      { role: "system", content: "You are an ecommerce performance analyst. You summarize data for execs." },
+      { role: "system", content: "You are an ecommerce performance analyst. You summarize performance reports for executives." },
       { role: "user", content: prompt }
     ]
   };
@@ -48,14 +79,29 @@ ${JSON.stringify(report, null, 2)}
   Logger.log("🧠 Daily AI Summary:");
   Logger.log(summary);
 
-  // Optional: send via email
-  // MailApp.sendEmail({
-  //   to: "you@example.com",
-  //   subject: `📈 Daily Exec Summary – ${report.date}`,
-  //   htmlBody: `<pre>${summary}</pre>`
-  // });
-  Logger.log("🧠 Daily AI Summary:");
-  Logger.log(summary);
+  writeAiSummaryToColumnP(summary);
+
 
   return summary;
+}
+
+function getAiContextFromSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("AI");
+  if (!sheet) {
+    Logger.log("⚠️ AI sheet not found.");
+    return {};
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const context = {};
+
+  data.forEach(row => {
+    const label = row[0]?.toString().trim();
+    const value = row[1]?.toString().trim();
+    if (label && value) {
+      context[label] = value;
+    }
+  });
+
+  return context;
 }

@@ -7,9 +7,11 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const refSheet = ss.getSheetByName("Campaign Reference");
-  const logSheetName = "Email Log";
-  const logSheet = ss.getSheetByName(logSheetName) || ss.insertSheet(logSheetName);
+  const logSheet = ss.getSheetByName("Email Log") || ss.insertSheet("Email Log");
+  const tz = Session.getScriptTimeZone();
 
+
+  // Ensure headers
   if (logSheet.getLastRow() === 0) {
     logSheet.appendRow([
       "Date", "Campaign Name", "Campaign ID", "Subject Line", "Preview Text", "Send Time",
@@ -23,13 +25,15 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
   const refData = refSheet.getDataRange().getValues();
   const refMap = {};
   for (let i = 1; i < refData.length; i++) {
-    const row = refData[i];
-    refMap[row[1]] = {
-      name: row[0],
-      subject_line: row[2],
-      preview_text: row[3],
-      send_time: row[4]
-    };
+    const [name, id, subject, preview, sendTime] = refData[i];
+    if (id) {
+      refMap[id.trim()] = {
+        name: name?.trim(),
+        subject_line: subject?.trim(),
+        preview_text: preview?.trim(),
+        send_time: sendTime
+      };
+    }
   }
 
   const existingRows = {};
@@ -37,45 +41,40 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
   if (lastRow > 1) {
     const existingData = logSheet.getRange(2, 1, lastRow - 1, 3).getValues();
     for (let i = 0; i < existingData.length; i++) {
-      const [rowDate, , campaignId] = existingData[i];
-      const key = `${rowDate}|${campaignId}`;
+      const [rawDate, , campaignId] = existingData[i];
+      const normalizedDate = Utilities.formatDate(new Date(rawDate), tz, "yyyy-MM-dd");
+      const key = `${normalizedDate}|${campaignId?.trim()}`;
       existingRows[key] = i + 2;
     }
+
   }
 
-  let writes = 0;
-  let updates = 0;
-
-  // 🧠 Summary tracking
-  let totalRevenue = 0;
-  let totalRecipients = 0;
-  let totalOpens = 0;
-  let totalClicks = 0;
-  let totalConversions = 0;
+  
+  const today = new Date();
+  let writes = 0, updates = 0, mostRecentDate = null;
+  let totalRevenue = 0, totalRecipients = 0, totalOpens = 0, totalClicks = 0, totalConversions = 0;
   const revenueByCampaign = {};
 
-  const today = new Date();
-  const tz = Session.getScriptTimeZone();
-  let mostRecentDate = null;
-
   results.forEach(r => {
-    const meta = refMap[r.campaign_id] || {};
+    const campaignId = r.campaign_id?.trim();
+    if (!campaignId) return;
+
+    const meta = refMap[campaignId] || {};
     const stats = r.stats || {};
 
-    const sendDate = meta.send_time
-      ? new Date(meta.send_time)
-      : new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const sendDate = meta.send_time ? new Date(meta.send_time) : new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     const dateStr = Utilities.formatDate(sendDate, tz, "yyyy-MM-dd");
+    const key = `${dateStr}|${campaignId}`;
+
     if (!mostRecentDate || sendDate > mostRecentDate) mostRecentDate = sendDate;
 
-    const key = `${dateStr}|${r.campaign_id}`;
     const revenue = parseFloat(stats.conversion_value || 0);
     const recipients = parseInt(stats.opens_unique || 0);
 
     const newRow = [
       dateStr,
       meta.name || "",
-      r.campaign_id || "",
+      campaignId,
       meta.subject_line || "",
       meta.preview_text || "",
       meta.send_time || "",
@@ -101,7 +100,7 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
       writes++;
     }
 
-    // 🧠 Aggregate summary stats
+    // 🧠 Aggregate tracking
     totalRevenue += revenue;
     totalRecipients += recipients;
     totalOpens += parseInt(stats.opens || 0);
@@ -112,10 +111,7 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
     revenueByCampaign[campaignName] = (revenueByCampaign[campaignName] || 0) + revenue;
   });
 
-  // 🥇 Top campaign today
-  const topCampaign = Object.entries(revenueByCampaign)
-    .sort((a, b) => b[1] - a[1])[0] || ["None", 0];
-
+  const topCampaign = Object.entries(revenueByCampaign).sort((a, b) => b[1] - a[1])[0] || ["None", 0];
   const summary = {
     source: "klaviyo_campaigns",
     date: mostRecentDate ? Utilities.formatDate(mostRecentDate, tz, "yyyy-MM-dd") : null,
@@ -128,11 +124,8 @@ function writeCampaignDailyStatsToLog(daysBack = 7) {
     topCampaignRevenue: parseFloat(topCampaign[1].toFixed(2))
   };
 
-  // 🧠 Add top campaign from past 7 days
-  const top7 = getTopCampaignLast7Days(); // <- defined separately
-  if (top7) {
-    summary.topCampaign7d = top7;
-  }
+  const top7 = getTopCampaignLast7Days?.();
+  if (top7) summary.topCampaign7d = top7;
 
   Logger.log(`📬 Wrote ${writes} new rows to Email Log.`);
   Logger.log(`🔁 Updated ${updates} existing rows in Email Log.`);
