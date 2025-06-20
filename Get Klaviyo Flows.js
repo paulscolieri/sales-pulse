@@ -9,7 +9,7 @@ function getYesterdayFlowEmailStats() {
     data: {
       type: "flow-values-report",
       attributes: {
-        timeframe: { key: "yesterday" },
+        timeframe: { key: "last_7_days" },
         statistics: [
           "recipients",
           "opens",
@@ -50,7 +50,7 @@ function getYesterdayFlowEmailStats() {
   const results = data?.data?.attributes?.results || [];
 
   if (results.length === 0) {
-    Logger.log("No flow email stats for yesterday.");
+    Logger.log("No flow email stats for the last week.");
     return [];
   }
 

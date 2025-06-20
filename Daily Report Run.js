@@ -26,6 +26,5 @@ function runDailyReporting() {
   const shopifyTrends = getShopifyKpiTrends();
   Logger.log(shopifyTrends);
 
-
   Logger.log("✅ Daily email reporting complete.");
 }

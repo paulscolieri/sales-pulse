@@ -11,7 +11,6 @@ function writeMetaAdInsightsToSheet() {
     Logger.log(`📄 Created new sheet: ${sheetName}`);
   }
 
-  // Add headers if empty
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
       "Date", "Campaign", "Ad Set", "Ad", "Ad ID",
@@ -21,12 +20,10 @@ function writeMetaAdInsightsToSheet() {
     ]);
   }
 
-  // Helper to normalize date format
   function normalizeDate(date) {
     return Utilities.formatDate(new Date(date), Session.getScriptTimeZone(), "yyyy-MM-dd");
   }
 
-  // Map existing "ad_id|date" to row number
   const existingMap = new Map();
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) {
@@ -36,10 +33,18 @@ function writeMetaAdInsightsToSheet() {
       const adId = row[4];
       if (rawDate && adId) {
         const key = `${adId}|${normalizeDate(rawDate)}`;
-        existingMap.set(key, i + 2); // actual row number
+        existingMap.set(key, i + 2);
       }
     });
   }
+
+  // 🧠 Summary tracking
+  let totalSpend = 0;
+  let totalRevenue = 0;
+  let totalPurchases = 0;
+  let bestROAS = 0;
+  let topAd = null;
+  const adStats = {};
 
   results.forEach(r => {
     const rowDate = r.date;
@@ -59,7 +64,59 @@ function writeMetaAdInsightsToSheet() {
       sheet.appendRow(rowData);
       Logger.log(`➕ Appended new row for ${r.ad_id} on ${rowDate}`);
     }
+
+    // Update summary tracking
+    const spend = parseFloat(r.spend || 0);
+    const revenue = parseFloat(r.revenue || 0);
+    const purchases = parseInt(r.purchases || 0);
+    
+
+
+    totalSpend += spend;
+    totalRevenue += revenue;
+    totalPurchases += purchases;
+
+    const adId = r.ad_id;
+    if (!adStats[adId]) {
+      adStats[adId] = {
+        adName: r.ad_name || "Unnamed Ad",
+        adId,
+        revenue: 0,
+        spend: 0,
+        purchases: 0
+      };
+    }
+    adStats[adId].revenue += revenue;
+    adStats[adId].spend += spend;
+    adStats[adId].purchases += purchases;
+
   });
 
-  Logger.log("✅ Ads Log synced.");
+  Object.values(adStats).forEach(ad => {
+  const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
+  ad.roas = parseFloat(roas.toFixed(2));
+
+  if (ad.roas > bestROAS) {
+    bestROAS = ad.roas;
+    topAd = ad;
+  }
+  });
+
+
+  const avgROAS = totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0;
+
+  const summary = {
+    source: "meta_ads",
+    date: normalizeDate(new Date()),
+    totalSpend: parseFloat(totalSpend.toFixed(2)),
+    totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+    totalPurchases,
+    avgROAS,
+    topAd
+  };
+
+  Logger.log("✅ Meta Ads Summary:");
+  Logger.log(JSON.stringify(summary, null, 2));
+
+  return summary;
 }
