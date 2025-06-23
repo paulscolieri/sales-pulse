@@ -27,7 +27,8 @@ Business Model: ${context["Business Model"] || "ecommerce"}
 Key Products: ${context["Key Products"] || "N/A"}  
 Focus this week: ${context["Strategic Focus This Week"] || "N/A"}  
 Current promo: ${context["Current Offers/Promos"] || "None"}  
-Known external factors: ${context["Known External Factors"] || "None"}  
+Known external factors: ${context["Known External Factors"] || "None"}
+Other Context: ${context["Other Context"] || "None"}    
 
 Use the following structure to answer these 5 exec-level questions:
 
@@ -57,7 +58,7 @@ ${JSON.stringify(report, null, 2)}
   const payload = {
     model: "gpt-4o",
     messages: [
-      { role: "system", content: "You are an ecommerce performance analyst. You summarize performance reports for executives." },
+      { role: "system", content: "You are a helpful, intelligent, world-class ecommerce performance analyst. You summarize performance reports for executives with key KPIs and business drivers. You provide suggestions on where to look if performance needs to be improved" },
       { role: "user", content: prompt }
     ]
   };
@@ -80,7 +81,7 @@ ${JSON.stringify(report, null, 2)}
   Logger.log(summary);
 
   writeAiSummaryToColumnP(summary);
-
+  sendSummaryToSlack(summary);
 
   return summary;
 }
@@ -105,3 +106,25 @@ function getAiContextFromSheet() {
 
   return context;
 }
+
+function sendSummaryToSlack(summaryText) {
+  const webhookUrl = PropertiesService.getScriptProperties().getProperty("SLACK_WEBHOOK_URL");
+
+  if (!webhookUrl) {
+    Logger.log("⚠️ Slack webhook URL not found in script properties.");
+    return;
+  }
+
+  const payload = {
+    text: `📈 *Daily Exec Summary – ${new Date().toLocaleDateString()}*\n\n${summaryText}`
+  };
+
+  UrlFetchApp.fetch(webhookUrl, {
+    method: "POST",
+    contentType: "application/json",
+    payload: JSON.stringify(payload)
+  });
+
+  Logger.log("✅ AI summary sent to Slack.");
+}
+

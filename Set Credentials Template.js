@@ -5,6 +5,7 @@ function setCredentials_template() {
   PropertiesService.getScriptProperties().setProperty('META_ACCESS_TOKEN', 'YOUR_META_TOKEN');
   PropertiesService.getScriptProperties().setProperty('META_AD_ACCOUNT_ID', 'act_{META_ACCOUNT_ID}');
   PropertiesService.getScriptProperties().setProperty('OPENAI_API_KEY', 'YOUR_OPEN_AI_API');
+  PropertiesService.getScriptProperties().setProperty('SLACK_WEBHOOK_URL', 'YOUR_SLACK_URL');
   
 }
 
