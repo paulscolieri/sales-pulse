@@ -34,11 +34,18 @@ function getCampaignSummaryFromSheet() {
   let clicks7d = 0;
   let conversions7d = 0;
 
+  let lastCampaignDate = null;
+  let numCampaigns7d = 0;
+  let totalOpensForAvg = 0;
+  let totalRecipientsForAvg = 0;
+  let totalClicksForAvg = 0;
+
   const dailyRevenueByCampaign = {};
   const revenueByCampaign7d = {};
 
   rows.forEach(row => {
-    const rowDateStr = Utilities.formatDate(new Date(row[dateCol]), tz, "yyyy-MM-dd");
+    const rowDateObj = new Date(row[dateCol]);
+    const rowDateStr = Utilities.formatDate(rowDateObj, tz, "yyyy-MM-dd");
     const campaign = row[campaignCol];
     const recipients = Number(row[recipientsCol]) || 0;
     const opens = Number(row[opensCol]) || 0;
@@ -53,6 +60,18 @@ function getCampaignSummaryFromSheet() {
       clicks7d += clicks;
       conversions7d += conversions;
       revenueByCampaign7d[campaign] = (revenueByCampaign7d[campaign] || 0) + revenue;
+      
+      if (campaign && recipients > 0) {
+        numCampaigns7d++;
+        totalOpensForAvg += opens;
+        totalRecipientsForAvg += recipients;
+        totalClicksForAvg += clicks;
+
+        // Update last campaign date if this is the latest so far
+        if (!lastCampaignDate || rowDateObj > lastCampaignDate) {
+          lastCampaignDate = rowDateObj;
+        }
+      }
     }
 
     if (rowDateStr === yStr) {
@@ -64,6 +83,14 @@ function getCampaignSummaryFromSheet() {
       dailyRevenueByCampaign[campaign] = (dailyRevenueByCampaign[campaign] || 0) + revenue;
     }
   });
+
+  // Compute average open & click rates if any campaigns sent
+  let avgOpenRate7d = 0;
+  let avgClickRate7d = 0;
+  if (totalRecipientsForAvg > 0) {
+    avgOpenRate7d = (totalOpensForAvg / totalRecipientsForAvg) * 100;
+    avgClickRate7d = (totalClicksForAvg / totalRecipientsForAvg) * 100;
+  }
 
   const sortedDaily = Object.entries(dailyRevenueByCampaign).sort((a, b) => b[1] - a[1]);
   const topCampaignDaily = dailyRevenue > 0 ? sortedDaily[0] : ["None", 0];
@@ -89,7 +116,12 @@ function getCampaignSummaryFromSheet() {
     clicks7d,
     conversions7d,
     topCampaign7d: topCampaign7d[0],
-    topCampaignRevenue7d: parseFloat(topCampaign7d[1].toFixed(2))
+    topCampaignRevenue7d: parseFloat(topCampaign7d[1].toFixed(2)),
+
+    numCampaigns7d,
+    avgOpenRate7d: parseFloat(avgOpenRate7d.toFixed(2)),
+    avgClickRate7d: parseFloat(avgClickRate7d.toFixed(2)),
+    lastCampaignDate: lastCampaignDate ? Utilities.formatDate(lastCampaignDate, tz, "yyyy-MM-dd") : "None"
   };
 
   Logger.log("📣 Klaviyo Campaign Summary:");
